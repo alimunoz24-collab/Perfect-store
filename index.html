@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -111,7 +112,7 @@
   .brand-header:active { opacity: .8; }
 
   .brand-name { font-weight: 600; font-size: 16px; letter-spacing: .3px; }
-  .brand-right { display: flex; align-items: center; gap: 12px; }
+  .brand-right { display: flex; align-items: center; gap: 10px; }
 
   .brand-ps {
     font-family: 'Bebas Neue', sans-serif;
@@ -119,6 +120,18 @@
     min-width: 52px; text-align: right;
     transition: color .3s;
   }
+
+  /* INVENTORY BADGE */
+  .inv-badge {
+    font-size: 11px; font-weight: 600;
+    padding: 4px 10px; border-radius: 20px;
+    letter-spacing: 0.4px; white-space: nowrap;
+    transition: background .2s, color .2s, border-color .2s;
+  }
+  .inv-badge.inv-none    { background: #2a2a2a; color: #777; border: 1px solid #333; display: none; }
+  .inv-badge.inv-okay    { background: #1a3d26; color: #4FC47A; border: 1px solid #2d6640; }
+  .inv-badge.inv-potential { background: #3d3010; color: #C9A84C; border: 1px solid #6b5218; }
+  .inv-badge.inv-oos     { background: #3d1515; color: #E05252; border: 1px solid #6b2222; }
 
   .chevron { color: var(--muted); font-size: 13px; transition: transform .25s; display: inline-block; }
   .collapsed .chevron { transform: rotate(-90deg); }
@@ -160,6 +173,38 @@
   .tgl.cumple.active    { background: var(--green); border-color: var(--green); color: #fff; }
   .tgl.nocumple.active  { background: var(--red);   border-color: var(--red);   color: #fff; }
   .tgl.na.active        { background: var(--surface); border-color: var(--muted); color: var(--text); }
+
+  /* INVENTORY ROW */
+  .inv-row {
+    display: flex; align-items: center;
+    padding: 12px 16px;
+    background: #1c1c1c;
+    border-top: 1px solid var(--border);
+    gap: 10px;
+  }
+  .inv-info { flex: 1; min-width: 0; }
+  .inv-label { font-size: 13px; font-weight: 500; color: var(--text); }
+  .inv-sublabel { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .inv-tgl-group { display: flex; gap: 5px; flex-shrink: 0; }
+  .inv-tgl {
+    border: 1.5px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 8px 9px;
+    font-size: 11px; font-weight: 600; font-family: inherit;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s;
+    white-space: nowrap;
+    line-height: 1.2;
+    text-align: center;
+    min-width: 52px;
+  }
+  .inv-tgl:active { opacity: .7; }
+  .inv-tgl.okay.active      { background: #1a3d26; border-color: #2d6640; color: #4FC47A; }
+  .inv-tgl.potential.active { background: #3d3010; border-color: #6b5218; color: #C9A84C; }
+  .inv-tgl.oos.active       { background: #3d1515; border-color: #6b2222; color: #E05252; }
 
   /* PS COLOR CLASSES */
   .ps-hi  { color: var(--green); }
@@ -296,10 +341,20 @@ const CATS = [
   { key:'zonaFria',       label:'Zona Fría',         weight:25 },
   { key:'checkout',       label:'Checkout',          weight:10 },
 ];
+const INV_OPTIONS = [
+  { key:'okay',      label:'Okay' },
+  { key:'potential', label:'Potential' },
+  { key:'oos',       label:'Out of Stock' },
+];
 
 // state: null | 'cumple' | 'nocumple' | 'na'
 const state = {};
-BRANDS.forEach(b => { state[b] = {}; CATS.forEach(c => state[b][c.key] = null); });
+const invState = {}; // null | 'okay' | 'potential' | 'oos'
+BRANDS.forEach(b => {
+  state[b] = {};
+  CATS.forEach(c => state[b][c.key] = null);
+  invState[b] = null;
+});
 
 // collapsed state per brand
 const collapsed = {};
@@ -337,6 +392,13 @@ function psClass(val) {
   return 'ps-lo';
 }
 
+function invBadgeHTML(brand) {
+  const inv = invState[brand];
+  if (!inv) return '';
+  const labels = { okay: 'Okay', potential: 'Potential', oos: 'Out of Stock' };
+  return `<span class="inv-badge inv-${inv}">${labels[inv]}</span>`;
+}
+
 // ── RENDER ALL ──
 function renderAll() {
   document.getElementById('brandsContainer').innerHTML = BRANDS.map(b => renderCardHTML(b)).join('');
@@ -368,29 +430,46 @@ function renderCardHTML(brand) {
     </div>`;
   }).join('');
 
+  const inv = invState[brand];
+  const invRow = `
+    <div class="inv-row">
+      <div class="inv-info">
+        <div class="inv-label">Inventario</div>
+        <div class="inv-sublabel">Solo informativo · no afecta el índice</div>
+      </div>
+      <div class="inv-tgl-group">
+        <button class="inv-tgl okay ${inv==='okay'?'active':''}"
+          onclick="pickInv('${safeId(brand)}','okay')">Okay</button>
+        <button class="inv-tgl potential ${inv==='potential'?'active':''}"
+          onclick="pickInv('${safeId(brand)}','potential')">Potential</button>
+        <button class="inv-tgl oos ${inv==='oos'?'active':''}"
+          onclick="pickInv('${safeId(brand)}','oos')">Out of<br>Stock</button>
+      </div>
+    </div>`;
+
   return `
   <div class="brand-card" id="bc-${safeId(brand)}">
     <div class="brand-header" onclick="toggleCard('${safeId(brand)}')">
       <span class="brand-name">${brand}</span>
       <div class="brand-right">
+        <span class="inv-badge ${inv ? 'inv-'+inv : 'inv-none'}" id="invbadge-${safeId(brand)}">${inv ? INV_OPTIONS.find(o=>o.key===inv).label : ''}</span>
         <span class="brand-ps ${psClass(ps)}" id="ps-${safeId(brand)}">${ps !== null ? ps.toFixed(1) : '—'}</span>
         <span class="chevron" style="transform:${chevRot}">▾</span>
       </div>
     </div>
     <div class="brand-body" style="max-height:${bodyMaxH}">
       ${tpRows}
+      ${invRow}
     </div>
   </div>`;
 }
 
-// ── PICK (no full re-render, just update DOM) ──
+// ── PICK touchpoint ──
 function pick(brandId, catKey, val) {
   const brand = BRANDS.find(b => safeId(b) === brandId);
   if (!brand) return;
-  // toggle off if same
   state[brand][catKey] = state[brand][catKey] === val ? null : val;
 
-  // update buttons in this card
   const card = document.getElementById(`bc-${brandId}`);
   CATS.forEach(cat => {
     const rows = card.querySelectorAll('.tp-row');
@@ -404,13 +483,38 @@ function pick(brandId, catKey, val) {
     });
   });
 
-  // update PS badge
   const ps = calcPS(brand);
   const badge = document.getElementById(`ps-${brandId}`);
   badge.textContent = ps !== null ? ps.toFixed(1) : '—';
   badge.className = `brand-ps ${psClass(ps)}`;
 
   updateGI();
+}
+
+// ── PICK inventory ──
+function pickInv(brandId, val) {
+  const brand = BRANDS.find(b => safeId(b) === brandId);
+  if (!brand) return;
+  // toggle off if same
+  invState[brand] = invState[brand] === val ? null : val;
+
+  // update inv buttons
+  const card = document.getElementById(`bc-${brandId}`);
+  INV_OPTIONS.forEach(opt => {
+    const btn = card.querySelector(`.inv-tgl.${opt.key}`);
+    if (btn) btn.classList.toggle('active', invState[brand] === opt.key);
+  });
+
+  // update badge in header
+  const badgeEl = document.getElementById(`invbadge-${brandId}`);
+  const inv = invState[brand];
+  if (inv) {
+    badgeEl.textContent = INV_OPTIONS.find(o => o.key === inv).label;
+    badgeEl.className = `inv-badge inv-${inv}`;
+  } else {
+    badgeEl.textContent = '';
+    badgeEl.className = 'inv-badge inv-none';
+  }
 }
 
 function toggleCard(brandId) {
@@ -441,7 +545,10 @@ function updateGI() {
 // ── RESET ──
 function resetForm() {
   if (!confirm('¿Reiniciar toda la evaluación?')) return;
-  BRANDS.forEach(b => CATS.forEach(c => state[b][c.key] = null));
+  BRANDS.forEach(b => {
+    CATS.forEach(c => state[b][c.key] = null);
+    invState[b] = null;
+  });
   BRANDS.forEach(b => collapsed[b] = false);
   ['tienda','clase','promotor','codigo'].forEach(id => document.getElementById(id).value='');
   document.getElementById('fecha').value = new Date().toISOString().split('T')[0];
@@ -453,17 +560,18 @@ function resetForm() {
 function exportCSV() {
   const m = meta();
   const hdr = ['Tienda','Clase','Fecha','Promotor','Código','Marca',
-    ...CATS.map(c=>`${c.label} (${c.weight}%)`),'Índice PS'];
+    ...CATS.map(c=>`${c.label} (${c.weight}%)`), 'Inventario', 'Índice PS'];
   const rows = [hdr];
   BRANDS.forEach(b => {
     const ps = calcPS(b);
     rows.push([m.tienda,m.clase,m.fecha,m.promotor,m.codigo,b,
       ...CATS.map(c=>state[b][c.key]||''),
+      invState[b] || '',
       ps!==null?ps.toFixed(2):'—']);
   });
   const giVals = BRANDS.map(b=>calcPS(b)).filter(v=>v!==null);
   const gi = giVals.length?(giVals.reduce((a,b)=>a+b,0)/giVals.length).toFixed(2):'—';
-  rows.push(['','','','','','ÍNDICE GENERAL',...CATS.map(()=>''),gi]);
+  rows.push(['','','','','','ÍNDICE GENERAL',...CATS.map(()=>''),'',gi]);
 
   const csv = rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');
   const a = document.createElement('a');
@@ -478,8 +586,10 @@ async function sendToSheets() {
   if (!scriptUrl) { toggleSettings(); showToast('⚠ Configura la URL primero'); return; }
   const m = meta();
   const payload = { ...m, marcas: BRANDS.map(b => ({
-    marca:b, ...Object.fromEntries(CATS.map(c=>[c.key,state[b][c.key]||''])),
-    indicePS: calcPS(b)!==null?calcPS(b).toFixed(2):'—'
+    marca: b,
+    ...Object.fromEntries(CATS.map(c=>[c.key, state[b][c.key]||''])),
+    inventario: invState[b] || '',
+    indicePS: calcPS(b)!==null ? calcPS(b).toFixed(2) : '—'
   }))};
   showToast('Enviando…');
   try {
